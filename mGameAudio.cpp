@@ -57,7 +57,7 @@ bool MGameAudio::init()
         return false;
     }
     XAUDIO2FX_REVERB_PARAMETERS native;
-    ReverbConvertI3DL2ToNative(&g_PRESET_PARAMS[0], &native);
+    ReverbConvertI3DL2ToNative(&g_PRESET_PARAMS[1], &native);
 
     if (FAILED(hr = pSubmixVoice->SetEffectParameters(0, &native, sizeof(native)))) {
         DEBUG_PRINT("SetEffectParameters failed, result: %ld", hr);
@@ -345,59 +345,65 @@ bool MGameAudio::updateListenerPosition(std::string voiceName, XMFLOAT3 &positio
 
 }
 
-int main()
+
+void MGameAudio::runTestCase()
 {
     MGameAudio::init();
     MGameAudio::createNewVoice("test", "test.wav");
     MGameAudio::createNewVoice("test1", "test1.wav");
-    
-    
-    
+
+
+
     XMFLOAT3 emitterPos = { 0, 0, 0 };
-    
+
     std::thread updateThread = std::thread([&emitterPos]() {
         while (1) {
-            
+
             MGameAudio::updateEmitterPosition("test1", emitterPos);
             MGameAudio::updateEmitterPosition("test", emitterPos);
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
-    });
-    std::thread playThread = std::thread([&emitterPos] () {
+        });
+    std::thread playThread = std::thread([&emitterPos]() {
         float angle = 0.0f;
         float speed = 0.1f;
         const float RADIUS = 10.0f;
         const float CENTER_X = 0.0f;
         float CENTER_Y = 0.0f;
         const float CENTER_Z = 0.0f;
-        while (1) {
-           
-            while (true) {
-                
-                emitterPos.x = CENTER_X + RADIUS * cos(angle);
-                emitterPos.y = CENTER_Y;
-                emitterPos.z = CENTER_Z + RADIUS * sin(angle);
-                // Increment angle for next frame
-                angle += speed;
-                if (angle >= 2 * X3DAUDIO_PI) {
-                    angle -= 2 * X3DAUDIO_PI;
-                }
-                DEBUG_PRINT("x: %.2f, y: %.2f, z: %.2f", emitterPos.x, emitterPos.y, emitterPos.z);
 
-                std::this_thread::sleep_for(std::chrono::milliseconds(16));
-                
+        while (true) {
+
+            emitterPos.x = CENTER_X + RADIUS * cos(angle);
+            emitterPos.y = CENTER_Y;
+            emitterPos.z = CENTER_Z + RADIUS * sin(angle);
+            angle += speed;
+            if (angle >= 2 * X3DAUDIO_PI) {
+                angle -= 2 * X3DAUDIO_PI;
             }
+            DEBUG_PRINT("x: %.2f, y: %.2f, z: %.2f", emitterPos.x, emitterPos.y, emitterPos.z);
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(16));
+
         }
-        
-    });
-    
-    
+
+
+        });
+
+
     updateThread.detach();
     playThread.detach();
-    while(1){
+    while (1) {
         MGameAudio::printData();
         MGameAudio::playAudio("test", true);
         MGameAudio::playAudio("test1", true);
         Sleep(1000);
     }
+
+
 }
+
+//int main()
+//{
+//    MGameAudio::runTestCase();
+//}

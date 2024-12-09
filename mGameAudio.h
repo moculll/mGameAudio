@@ -17,10 +17,10 @@ class MGameAudio {
     
 private:
     inline static MGameAudio* instance = nullptr;
-
-public:
-    MGameAudio(){}
+    MGameAudio() {}
     ~MGameAudio() {}
+public:
+    
     
     static bool init();
     
@@ -29,6 +29,7 @@ public:
     static bool updateEmitterPosition(std::string voiceName, DirectX::XMFLOAT3 &position);
     static bool updateListenerPosition(std::string voiceName, DirectX::XMFLOAT3 &position);
     static void printData();
+    static void runTestCase();
 private:
 
     struct PlayUnit{

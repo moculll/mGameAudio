@@ -397,7 +397,7 @@ void MGameAudio::runTestCase()
         MGameAudio::printData();
         MGameAudio::playAudio("test", true);
         MGameAudio::playAudio("test1", true);
-        Sleep(1000);
+        Sleep(3000);
     }
 
 

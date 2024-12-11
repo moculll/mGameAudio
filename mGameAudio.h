@@ -16,20 +16,34 @@
 class MGameAudio {
     
 private:
-    inline static MGameAudio* instance = nullptr;
-    MGameAudio() {}
-    ~MGameAudio() {}
+    MGameAudio() = delete;
+    ~MGameAudio() = delete;
 public:
-    
-    
+    enum class UpdatePositionParam {
+        LISTENER,
+        EMITTER,
+    };
+    /* this function requires from -10.0 to 10.0 Audio Position */
+    template <typename MGameAudio::UpdatePositionParam>
+    static bool updatePosition(std::string voiceName, DirectX::XMFLOAT3& position);
+
+
     static bool init();
     
     static bool createNewVoice(std::string voiceName, std::string voicePath);
     static bool playAudio(std::string voiceName, bool interrupt);
-    static bool updateEmitterPosition(std::string voiceName, DirectX::XMFLOAT3 &position);
-    static bool updateListenerPosition(std::string voiceName, DirectX::XMFLOAT3 &position);
     static void printData();
     static void runTestCase();
+
+    template <typename T>
+    inline static T posGame2Audio(const T& point, const T& rangeMin, const T& rangeMax)
+    {
+        T audioPos;
+        audioPos.x = mapValue(point.x, rangeMin.x, rangeMax.x, -10.0f, 10.0f);
+        audioPos.y = mapValue(point.y, rangeMin.y, rangeMax.y, -10.0f, 10.0f);
+        audioPos.z = mapValue(point.z, rangeMin.z, rangeMax.z, -10.0f, 10.0f);
+        return audioPos;
+    }
 private:
 
     struct PlayUnit{
@@ -39,9 +53,15 @@ private:
         X3DAUDIO_LISTENER listener;
         X3DAUDIO_EMITTER emitter;
     };
-    inline static std::map<std::string, PlayUnit> voiceMap;
+    inline static std::map<std::string, MGameAudio::PlayUnit> voiceMap;
 
-    
+    template <typename T>
+    inline static T mapValue(T value, T inMin, T inMax, T outMin, T outMax)
+    {
+        return (value - inMin) / (inMax - inMin) * (outMax - outMin) + outMin;
+    }
+
+    static bool submitPositionChanges(MGameAudio::PlayUnit& unit);
 
     inline static IXAudio2* pXAudio2 = nullptr;
     inline static Microsoft::WRL::ComPtr<IUnknown> pReverbEffect;

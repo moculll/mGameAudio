@@ -2,19 +2,23 @@
 
 #include "mGameAudio.h"
 #include <thread>
+
+#define DEBUG_PRINT_ENABLE 1
+#if DEBUG_PRINT_ENABLE
 #define DEBUG_PRINT(fmt, ...) \
             do { \
                 printf("[mGameAudio.cpp][%s.%d]" fmt "\r\n", __func__, __LINE__, ##__VA_ARGS__); \
             } while(0);
+#else
+#define DEBUG_PRINT(fmt, ...)
+#endif
+
 
 using namespace DirectX;
 
 
 bool MGameAudio::init()
 {
-    if (!instance) {
-        instance = new MGameAudio;
-    }
     HRESULT hr;
     hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     if (FAILED(hr)) {
@@ -225,7 +229,50 @@ bool MGameAudio::playAudio(std::string voiceName, bool interrupt)
     return true;
 
 }
-bool MGameAudio::updateEmitterPosition(std::string voiceName, XMFLOAT3& position)
+
+
+bool MGameAudio::submitPositionChanges(MGameAudio::PlayUnit &unit)
+{
+    static HRESULT hr;
+    DWORD dwCalcFlags = X3DAUDIO_CALCULATE_MATRIX | X3DAUDIO_CALCULATE_DOPPLER
+        | X3DAUDIO_CALCULATE_LPF_DIRECT | X3DAUDIO_CALCULATE_LPF_REVERB
+        | X3DAUDIO_CALCULATE_REVERB;
+
+    dwCalcFlags |= X3DAUDIO_CALCULATE_REDIRECT_TO_LFE;
+
+    X3DAudioCalculate(x3DInstance, &unit.listener, &unit.emitter, dwCalcFlags, &dspSettings);
+
+    if (FAILED(hr = unit.pSourceVoice->SetFrequencyRatio(dspSettings.DopplerFactor))) {
+        DEBUG_PRINT("SetFrequencyRatio failed, result: %ld", hr);
+        return false;
+    }
+
+    if (FAILED(hr = unit.pSourceVoice->SetOutputMatrix(pMasterVoice, 1, details.InputChannels, matrixCoefficients))) {
+        DEBUG_PRINT("SetOutputMatrix failed, result: %ld", hr);
+        return false;
+    }
+
+    if (FAILED(hr = unit.pSourceVoice->SetOutputMatrix(pSubmixVoice, 1, 1, &dspSettings.ReverbLevel))) {
+        DEBUG_PRINT("SetOutputMatrix failed, result: %ld, %lf", hr, dspSettings.ReverbLevel);
+        return false;
+    }
+
+    XAUDIO2_FILTER_PARAMETERS FilterParametersDirect = { LowPassFilter, 2.0f * sinf(X3DAUDIO_PI / 6.0f * dspSettings.LPFDirectCoefficient), 1.0f };
+    if (FAILED(hr = unit.pSourceVoice->SetOutputFilterParameters(pMasterVoice, &FilterParametersDirect))) {
+        DEBUG_PRINT("SetOutputFilterParameters failed, result: %ld", hr);
+        return false;
+    }
+
+    XAUDIO2_FILTER_PARAMETERS FilterParametersReverb = { LowPassFilter, 2.0f * sinf(X3DAUDIO_PI / 6.0f * dspSettings.LPFReverbCoefficient), 1.0f };
+    if (FAILED(hr = unit.pSourceVoice->SetOutputFilterParameters(pSubmixVoice, &FilterParametersReverb))) {
+        DEBUG_PRINT("SetOutputFilterParameters failed, result: %ld", hr);
+        return false;
+    }
+    return true;
+}
+
+template<>
+bool MGameAudio::updatePosition<MGameAudio::UpdatePositionParam::EMITTER>(std::string voiceName, XMFLOAT3& position)
 {
     auto it = voiceMap.find(voiceName);
     if (it == voiceMap.end()) {
@@ -233,115 +280,29 @@ bool MGameAudio::updateEmitterPosition(std::string voiceName, XMFLOAT3& position
         return false;
     }
 
-    HRESULT hr;
-
-    it->second.listener.Position.x = 0.0f;
-    it->second.listener.Position.y = 0.0f;
-    it->second.listener.Position.z = 0.0f;
-    it->second.listener.Velocity.x = it->second.listener.Velocity.y = it->second.listener.Velocity.z = 1.0f;
-
-    it->second.listener.OrientFront.x = 0.0f;
-    it->second.listener.OrientFront.y = 0.0f;
-    it->second.listener.OrientFront.z = 1.0f;
-
-    it->second.listener.OrientTop.x = 0.0f;
-    it->second.listener.OrientTop.y = 1.0f;
-    it->second.listener.OrientTop.z = 0.0f;
-
-    it->second.listener.pCone = (X3DAUDIO_CONE*)&Listener_DirectionalCone;
-
     it->second.emitter.Position = position;
-
-    it->second.emitter.OrientFront.x = 0.0f;
-    it->second.emitter.OrientFront.y = 0.0f;
-    it->second.emitter.OrientFront.z = 1.0f;
-    it->second.emitter.OrientTop.x = 0.0f;
-    it->second.emitter.OrientTop.y = 1.0f;
-    it->second.emitter.OrientTop.z = 0.0f;
-
-    it->second.emitter.pCone = &emitterCone;
-    it->second.emitter.pCone->InnerAngle = 0.0f;
-    it->second.emitter.pCone->OuterAngle = 0.0f;
-    it->second.emitter.pCone->InnerVolume = 0.0f;
-    it->second.emitter.pCone->OuterVolume = 1.0f;
-    it->second.emitter.pCone->InnerLPF = 0.0f;
-    it->second.emitter.pCone->OuterLPF = 1.0f;
-    it->second.emitter.pCone->InnerReverb = 0.0f;
-    it->second.emitter.pCone->OuterReverb = 1.0f;
-
-    it->second.emitter.Velocity.x = 0.0f;
-    it->second.emitter.Velocity.y = 0.0f;
-    it->second.emitter.Velocity.z = 0.0f;
-
-    it->second.emitter.ChannelCount = 1;
-    it->second.emitter.ChannelRadius = 1.0f;
-
-    it->second.emitter.InnerRadius = 2.0f;
-    it->second.emitter.InnerRadiusAngle = X3DAUDIO_PI / 4.0f;
-
-    it->second.emitter.pVolumeCurve = (X3DAUDIO_DISTANCE_CURVE*)&X3DAudioDefault_LinearCurve;
-    it->second.emitter.pLFECurve = (X3DAUDIO_DISTANCE_CURVE*)&Emitter_LFE_Curve;
-    it->second.emitter.pLPFDirectCurve = nullptr;
-    it->second.emitter.pLPFReverbCurve = nullptr;
-    it->second.emitter.pReverbCurve = (X3DAUDIO_DISTANCE_CURVE*)&Emitter_Reverb_Curve;
-    it->second.emitter.CurveDistanceScaler = 14.0f;
-    it->second.emitter.DopplerScaler = 1.0f;
-
-    DWORD dwCalcFlags = X3DAUDIO_CALCULATE_MATRIX | X3DAUDIO_CALCULATE_DOPPLER
-        | X3DAUDIO_CALCULATE_LPF_DIRECT | X3DAUDIO_CALCULATE_LPF_REVERB
-        | X3DAUDIO_CALCULATE_REVERB;
-
-    dwCalcFlags |= X3DAUDIO_CALCULATE_REDIRECT_TO_LFE;
-
-    X3DAudioCalculate(x3DInstance, &it->second.listener, &it->second.emitter, dwCalcFlags, &dspSettings);
-
-    if (FAILED(hr = it->second.pSourceVoice->SetFrequencyRatio(dspSettings.DopplerFactor))) {
-        DEBUG_PRINT("SetFrequencyRatio failed, result: %ld", hr);
-        return false;
-    }
-
-    if (FAILED(hr = it->second.pSourceVoice->SetOutputMatrix(pMasterVoice, 1, details.InputChannels, matrixCoefficients))) {
-        DEBUG_PRINT("SetOutputMatrix failed, result: %ld", hr);
-        return false;
-    }
-
-    if (FAILED(hr = it->second.pSourceVoice->SetOutputMatrix(pSubmixVoice, 1, 1, &dspSettings.ReverbLevel))) {
-        DEBUG_PRINT("SetOutputMatrix failed, result: %ld, %lf", hr, dspSettings.ReverbLevel);
-        return false;
-    }
-
-    XAUDIO2_FILTER_PARAMETERS FilterParametersDirect = { LowPassFilter, 2.0f * sinf(X3DAUDIO_PI / 6.0f * dspSettings.LPFDirectCoefficient), 1.0f };
-    if (FAILED(hr = it->second.pSourceVoice->SetOutputFilterParameters(pMasterVoice, &FilterParametersDirect))) {
-        DEBUG_PRINT("SetOutputFilterParameters failed, result: %ld", hr);
-        return false;
-    }
-
-    XAUDIO2_FILTER_PARAMETERS FilterParametersReverb = { LowPassFilter, 2.0f * sinf(X3DAUDIO_PI / 6.0f * dspSettings.LPFReverbCoefficient), 1.0f };
-    if (FAILED(hr = it->second.pSourceVoice->SetOutputFilterParameters(pSubmixVoice, &FilterParametersReverb))) {
-        DEBUG_PRINT("SetOutputFilterParameters failed, result: %ld", hr);
-        return false;
-    }
-
-    return true;
+    return MGameAudio::submitPositionChanges(it->second);
 }
+
+template<>
+bool MGameAudio::updatePosition<MGameAudio::UpdatePositionParam::LISTENER>(std::string voiceName, XMFLOAT3& position)
+{
+    auto it = voiceMap.find(voiceName);
+    if (it == voiceMap.end()) {
+        DEBUG_PRINT("updateEmitterPosition failed, voiceName doesn't exist.");
+        return false;
+    }
+
+    it->second.listener.Position = position;
+    return MGameAudio::submitPositionChanges(it->second);
+}
+
 
 void MGameAudio::printData()
 {
 
     DEBUG_PRINT("%.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f", dspSettings.LPFDirectCoefficient, dspSettings.LPFReverbCoefficient \
     , dspSettings.ReverbLevel, dspSettings.DopplerFactor, dspSettings.EmitterToListenerAngle, dspSettings.EmitterToListenerDistance, dspSettings.EmitterVelocityComponent, dspSettings.ListenerVelocityComponent);
-
-}
-
-
-bool MGameAudio::updateListenerPosition(std::string voiceName, XMFLOAT3 &position)
-{
-    auto it = voiceMap.find(voiceName);
-    if (it == voiceMap.end()) {
-        DEBUG_PRINT("updateListenerPosition failed, voiceName doesn't exists.");
-        return false;
-    }
-
 
 }
 
@@ -359,8 +320,8 @@ void MGameAudio::runTestCase()
     std::thread updateThread = std::thread([&emitterPos]() {
         while (1) {
 
-            MGameAudio::updateEmitterPosition("test1", emitterPos);
-            MGameAudio::updateEmitterPosition("test", emitterPos);
+            MGameAudio::updatePosition<MGameAudio::UpdatePositionParam::EMITTER>("test1", emitterPos);
+            MGameAudio::updatePosition<MGameAudio::UpdatePositionParam::LISTENER>("test", emitterPos);
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
         });
@@ -406,4 +367,6 @@ void MGameAudio::runTestCase()
 //int main()
 //{
 //    MGameAudio::runTestCase();
+//    return 0;
 //}
+

@@ -23,9 +23,11 @@ public:
         LISTENER,
         EMITTER,
     };
+    inline static DirectX::XMFLOAT3 defaultOrientFront = { .0f, .1f, .0f };
+    inline static DirectX::XMFLOAT3 defaultOrientTop = { .0f, .0f, .1f };
     /* this function requires from -10.0 to 10.0 Audio Position */
     template <typename MGameAudio::UpdatePositionParam>
-    static bool updatePosition(std::string voiceName, DirectX::XMFLOAT3& position);
+    static bool updatePosition(std::string voiceName, DirectX::XMFLOAT3& position, DirectX::XMFLOAT3& orientFront = defaultOrientFront, DirectX::XMFLOAT3& orientTop = defaultOrientTop);
 
 
     static bool init();

@@ -3,7 +3,7 @@
 #include "mGameAudio.h"
 #include <thread>
 
-#define DEBUG_PRINT_ENABLE 1
+#define DEBUG_PRINT_ENABLE 0
 #if DEBUG_PRINT_ENABLE
 #define DEBUG_PRINT(fmt, ...) \
             do { \
@@ -272,7 +272,7 @@ bool MGameAudio::submitPositionChanges(MGameAudio::PlayUnit &unit)
 }
 
 template<>
-bool MGameAudio::updatePosition<MGameAudio::UpdatePositionParam::EMITTER>(std::string voiceName, XMFLOAT3& position)
+bool MGameAudio::updatePosition<MGameAudio::UpdatePositionParam::EMITTER>(std::string voiceName, XMFLOAT3& position, DirectX::XMFLOAT3& orientFront, DirectX::XMFLOAT3& orientTop)
 {
     auto it = voiceMap.find(voiceName);
     if (it == voiceMap.end()) {
@@ -285,7 +285,7 @@ bool MGameAudio::updatePosition<MGameAudio::UpdatePositionParam::EMITTER>(std::s
 }
 
 template<>
-bool MGameAudio::updatePosition<MGameAudio::UpdatePositionParam::LISTENER>(std::string voiceName, XMFLOAT3& position)
+bool MGameAudio::updatePosition<MGameAudio::UpdatePositionParam::LISTENER>(std::string voiceName, XMFLOAT3& position, DirectX::XMFLOAT3& orientFront, DirectX::XMFLOAT3& orientTop)
 {
     auto it = voiceMap.find(voiceName);
     if (it == voiceMap.end()) {
@@ -294,6 +294,8 @@ bool MGameAudio::updatePosition<MGameAudio::UpdatePositionParam::LISTENER>(std::
     }
 
     it->second.listener.Position = position;
+    it->second.listener.OrientFront = orientFront;
+    it->second.listener.OrientTop = orientTop;
     return MGameAudio::submitPositionChanges(it->second);
 }
 

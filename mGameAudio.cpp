@@ -113,7 +113,7 @@ bool MGameAudio::createNewVoice(std::string voiceName, std::string voicePath)
     buffer.AudioBytes = waveSize;
     buffer.pAudioData = sampleData;
     buffer.Flags = XAUDIO2_END_OF_STREAM;
-    buffer.LoopCount = 1;/* XAUDIO2_LOOP_INFINITE; */
+    buffer.LoopCount = 0;/* XAUDIO2_LOOP_INFINITE; */
 
     X3DAUDIO_LISTENER listener;
     X3DAUDIO_EMITTER emitter;
@@ -160,7 +160,7 @@ bool MGameAudio::createNewVoice(std::string voiceName, std::string voicePath)
     emitter.OrientFront.z =
         emitter.OrientTop.y = 1.f;
 
-    emitter.ChannelCount = 1;
+    emitter.ChannelCount = 2;
     emitter.ChannelRadius = 1.0f;
 
     emitter.InnerRadius = 2.0f;
@@ -184,10 +184,6 @@ bool MGameAudio::createNewVoice(std::string voiceName, std::string voicePath)
         return false;
     }
     
-    buffer.pAudioData = sampleData;
-    buffer.Flags = XAUDIO2_END_OF_STREAM;
-    buffer.AudioBytes = waveSize;
-    buffer.LoopCount = XAUDIO2_LOOP_INFINITE;
 
     pSourceVoice->SubmitSourceBuffer(&buffer);
 
@@ -281,6 +277,8 @@ bool MGameAudio::updatePosition<MGameAudio::UpdatePositionParam::EMITTER>(std::s
     }
 
     it->second.emitter.Position = position;
+    it->second.emitter.OrientFront = orientFront;
+    it->second.emitter.OrientTop = orientTop;
     return MGameAudio::submitPositionChanges(it->second);
 }
 

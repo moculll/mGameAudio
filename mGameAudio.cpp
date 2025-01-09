@@ -160,7 +160,7 @@ bool MGameAudio::createNewVoice(std::string voiceName, std::string voicePath)
     emitter.OrientFront.z =
         emitter.OrientTop.y = 1.f;
 
-    emitter.ChannelCount = 2;
+    emitter.ChannelCount = 1;
     emitter.ChannelRadius = 1.0f;
 
     emitter.InnerRadius = 2.0f;

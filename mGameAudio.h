@@ -31,7 +31,7 @@ public:
 
 
     static bool init();
-    
+    /* currently only supports mono wav */
     static bool createNewVoice(std::string voiceName, std::string voicePath);
     static bool playAudio(std::string voiceName, bool interrupt);
     static void printData();
